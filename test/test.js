@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const hardhat = require("hardhat");
 const { ethers } = hardhat;
 
+const ValuableCoinsV3InBSC = 0xF6e497Bd65DfB7c0556020DD68d007f0AC76bc6a;
 
 describe("MoonFomo V3", function() {
   let signers = [];
@@ -29,7 +30,7 @@ describe("MoonFomo V3", function() {
     }
   });
 
-  it("Round & Ticket Processing", async function() {    
+  it("Init Round", async function() {    
     for (let i = 1; i < 8; i++)
       await valuableCoinsV3.transfer(signers[i].address, ethers.utils.parseEther("1000"));
 
@@ -47,24 +48,68 @@ describe("MoonFomo V3", function() {
     _rc = await _tx.wait(); 
     _event = _rc.events.find(event => event.event === 'RoundAddedTokens');
     const [roundCount1, newJackpot] = _event.args;
-    console.log("RoundAddedTokens done: ", roundCount1.toString(), newJackpot.toString());
+    console.log("RoundAddedTokens done: ", roundCount1.toString(), newJackpot.toString());    
 
+    console.log("Balance of Buyers");
+    for (let i = 1; i < 8; i++)
+      console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
+  });
+
+  it("Buy Tickets", async function() {
     for (let i = 1; i < 8; i++) {
-      const _tickets = 1;
-      const _balanceForTicket = await moonFomoV3.calcTicketCost(_tickets);
+      const _tickets = i;
+      const _balanceForTicket = await moonFomoV3.buyPrice(_tickets);
       await valuableCoinsV3.connect(signers[i]).approve(moonFomoV3.address, _balanceForTicket);
 
       _tx = await moonFomoV3.connect(signers[i]).buyTicket(_tickets);
       _rc = await _tx.wait(); 
       _event = _rc.events.find(event => event.event === 'TicketBought');
       const [buyer, ticketCount, ticketPrice] = _event.args;
-      console.log(_tickets, "ticket bought: ", buyer.toString(), ticketCount.toString(), ticketPrice.toString());  
-    }
+      console.log(_tickets, "Ticket bought: ", buyer.toString(), ticketCount.toString(), ticketPrice.toString());  
+    }    
 
+    console.log("Balance of Buyers");
+    for (let i = 1; i < 8; i++)
+      console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
+  });
+
+  it("End Round", async function() {
     _tx = await moonFomoV3.endRound();
     _rc = await _tx.wait(); 
     _event = _rc.events.find(event => event.event === 'RoundEnded');
     const [roundCount2, jackpot, ticketCount] = _event.args;
     console.log("EndRound done: ", roundCount2.toString(), jackpot.toString(), ticketCount.toString());
   });
+  
+  it("Calc Dividends & Payouts", async function() {
+    const _roundCount = await moonFomoV3.roundCount();
+    console.log("Round", _roundCount.toString());
+    for (let i = 1; i < 8; i++)
+      console.log("Buyer", i, 
+        ", calcDividends",
+        (await moonFomoV3.calcDividends(_roundCount, signers[i].address)).toString(),
+        ", calcPayouts",
+        (await moonFomoV3.calcPayout(_roundCount, signers[i].address)).toString());
+  });
+
+  it("Claim Dividends & Payouts", async function() {
+    const _roundCount = await moonFomoV3.roundCount();
+    console.log("Balance of Buyers");
+    for (let i = 1; i < 8; i++) {
+      await moonFomoV3.connect(signers[i]).claimDividends(await moonFomoV3.calcDividends(_roundCount, signers[i].address));
+    }
+
+    for (let i = 1; i < 8; i++) {
+      await moonFomoV3.connect(signers[i]).claimPayout(_roundCount);
+    }
+
+    for (let i = 1; i < 8; i++)
+      console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
+  });
+
+  it("Reinvest Dividends", async function() {
+
+  });
+
+
 });

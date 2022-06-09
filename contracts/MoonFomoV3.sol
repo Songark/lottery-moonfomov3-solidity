@@ -12,8 +12,11 @@ contract MoonFomoV3 is Ownable {
     using SafeMath for uint256;
     IERC20 MoondayToken;
     uint256 public roundCount;
-    uint256 public dollarIncrement = 200000;
-    uint256 public initialPrice = 256200000000000;
+    uint256 constant internal dividendFee_ = 10;
+    uint256 constant internal tokenPriceInitial_ = 0.005 ether;
+    uint256 constant internal tokenPriceIncremental_ = 1 ether;
+    uint256 constant internal incTokensPerTicket = 100 ether;
+
     uint256 public maxlatestholders = 6;
     uint256 public hoursForRound = 10;
     uint256 public secondsIncrement = 1000;
@@ -39,6 +42,7 @@ contract MoonFomoV3 is Ownable {
     event RoundStarted(uint256 round, uint256 endingTime);
     event RoundAddedTokens(uint256 round, uint256 newJackpot);
     event TicketBought(address buyer, uint256 ticketNumber, uint256 ticketPrice);
+    event TicketSold(address seller, uint256 ticketNumber, uint256 ticketPrice);
     event RoundEnded(uint256 round, uint256 jackpot, uint256 tickets);
     event TicketClaimed(uint256 round, address buyer, uint256 claimAmount);
     event DividendClaimed(uint256 round, address claimant, uint256 dividendAmount);
@@ -77,16 +81,7 @@ contract MoonFomoV3 is Ownable {
       emit RoundAddedTokens(roundCount, rounds[roundCount].jackpot);
     }
 
-    /// Starts a round and adds transaction to jackpot
-    /// @dev increments round count, initiates timer and loads jackpot
-    function setPricing(uint256 _initialPrice, uint256 _dollarIncrement) external onlyOwner {
-      require(rounds[roundCount].timer < block.timestamp, "Previous Round Not Ended!");
-
-      initialPrice = _initialPrice;
-      dollarIncrement = _dollarIncrement;
-    }
-
-    /// Calculate owner of ticket
+/// Calculate owner of ticket
     /// @dev calculates ticket owner
     /// @param _round the round to query
     /// @param _ticketIndex the ticket to query
@@ -104,11 +99,11 @@ contract MoonFomoV3 is Ownable {
       return rounds[_round].ticketsOwned[_user];
     }
 
-    /// Get ticket reimbursment amount by user
+    /// Get ticket reinvestment amount by user
     /// @dev calculates returnable ticket cost to user
     /// @param _round the round to query
     /// @param _user the user to query
-    /// @return ticket reimbursment amount for user
+    /// @return ticket reinvestment amount for user
     function getClaimList(uint256 _round, address _user) public view returns(uint256) {
       return rounds[_round].claimList[_user];
     }
@@ -122,21 +117,64 @@ contract MoonFomoV3 is Ownable {
       return rounds[_round].reclaimed[_user];
     }
 
-    /// Calculate ticket cost
+    /// Calculate buy price from tickets
     /// @dev calculates ticket price based on current holder pool
     /// @return current cost of ticket
-    function calcTicketCost(uint256 _amount) public view returns(uint256) {
-      uint additionalPool = 0;
-      uint256 sumCost = 0;
-      uint256 holderPool = rounds[roundCount].holderPool;
-      for(uint256 x = 0; x < _amount; x++){
-        sumCost += initialPrice + holderPool.add(additionalPool).div(dollarIncrement);
-        additionalPool = sumCost.div(10);        
+    function buyPrice(uint256 _amount) public view returns(uint256) {      
+      if (rounds[roundCount].holderPool == 0){
+          return tokenPriceInitial_;
+      } else {
+          uint256 _bsc = tokenPriceInitial_.add(rounds[roundCount].holderPool.mul(tokenPriceIncremental_).div(incTokensPerTicket));
+          return _bsc.mul(_amount);
       }
-      return sumCost;
     }
 
-    /// Buy a ticket
+    /// Calculate sell price from tickets
+    /// @dev calculates ticket price based on current holder pool
+    /// @return current cost of ticket
+    function sellPrice(uint256 _amount) public view returns(uint256) {      
+      if (rounds[roundCount].holderPool == 0){
+          return tokenPriceInitial_;
+      } else {
+          uint256 _bsc = tokenPriceInitial_.sub(rounds[roundCount].holderPool.mul(tokenPriceIncremental_).div(incTokensPerTicket));
+          return _bsc.mul(_amount);
+      }
+    }
+
+    /**
+     * Calculate Token price based on an amount of incoming bsc
+     * It's an algorithm, hopefully we gave you the whitepaper with it in scientific notation;
+     * Some conversions occurred to prevent decimal errors or underflows / overflows in solidity code.
+     */
+    function bscToTokens_(uint256 _bsc, uint256 tokenSupply_)
+        internal
+        view
+        returns(uint256)
+    {
+        uint256 _tokenPriceInitial = tokenPriceInitial_ * 1e18;
+        uint256 _tokensReceived = 0;
+        return _tokensReceived;
+    }
+    
+    /**
+     * Calculate token sell value.
+    */
+     function tokensToBSC_(uint256 _tokens, uint256 tokenSupply_)
+        internal
+        view
+        returns(uint256)
+    {
+
+        uint256 tokens_ = (_tokens + 1e18);
+        uint256 _tokenSupply = (tokenSupply_ + 1e18);
+        console.log('_tokenSupply:', _tokenSupply);
+        uint256 _etherReceived =
+          tokenPriceInitial_.add(tokenPriceIncremental_.mul(_tokenSupply.div(1e18))).sub(tokenPriceIncremental_).mul(_tokens)
+          .sub(tokenPriceIncremental_.mul((tokens_**2 - tokens_).div(1e18)).div(2)).div(1e18);
+        return _etherReceived;
+    }
+
+    /// Buy tickets using token
     /// @dev purchases a ticket and distributes funds
     /// @return ticket index
     function buyTicket(uint256 _amount) external payable returns(uint256){
@@ -144,7 +182,7 @@ contract MoonFomoV3 is Ownable {
       require(!rounds[roundCount].ended, "Round already ended!");
       require(_amount > 0, "Invalid amount");
 
-      uint256 ticketPrice = calcTicketCost(_amount);
+      uint256 ticketPrice = buyPrice(_amount);
       MoondayToken.transferFrom(msg.sender, address(this), ticketPrice);
 
       rounds[roundCount].jackpot += ticketPrice.mul(20).div(100);
@@ -176,6 +214,22 @@ contract MoonFomoV3 is Ownable {
       return rounds[roundCount].ticketCount;
     }
 
+    /// Sell tickets for token
+    /// @dev sell tickets and receive tokens
+    /// @return tokens amount
+    function sellTicket(uint256 _amount) external payable returns(uint256){
+      require(!rounds[roundCount].ended, "Round already ended!");
+      require(rounds[roundCount].ticketsOwned[msg.sender] >= _amount, "Insufficient tickets");
+
+      uint256 ticketPrice = sellPrice(_amount);
+      rounds[roundCount].ticketsOwned[msg.sender] -= _amount;
+      rounds[roundCount].ticketCount -= _amount;
+      rounds[roundCount].holderPool -= ticketPrice;
+      MoondayToken.transfer(msg.sender, ticketPrice);
+      
+      emit TicketSold(msg.sender, rounds[roundCount].ticketCount, ticketPrice);
+      return ticketPrice;
+    }
 
     /// Set the increment seconds
     /// @dev can change the additional seconds for each ticket purchase
@@ -196,7 +250,8 @@ contract MoonFomoV3 is Ownable {
 
       uint256 claimMaxTicketHolder = rounds[roundCount].jackpot.mul(40).div(100);
       uint256 claimLatestTicketHolders = rounds[roundCount].jackpot.sub(claimMaxTicketHolder);
-      MoondayToken.transfer(rounds[roundCount].maxticketsholder, claimMaxTicketHolder);
+      claimMaxTicketHolder = claimMaxTicketHolder.add(rounds[roundCount].claimList[rounds[roundCount].maxticketsholder]);
+      rounds[roundCount].claimList[rounds[roundCount].maxticketsholder] = claimMaxTicketHolder;
 
       uint256 _index = 0;
       address[] memory latestholders = new address[](maxlatestholders);
@@ -209,7 +264,7 @@ contract MoonFomoV3 is Ownable {
       }
 
       for (uint256 i = 0; i < _index; i++) {
-        MoondayToken.transfer(payable(latestholders[i]), claimLatestTicketHolders.div(_index));
+        rounds[roundCount].claimList[latestholders[i]] = rounds[roundCount].claimList[latestholders[i]].add(claimLatestTicketHolders.div(_index));
       }
 
       rounds[roundCount].ended = true;
@@ -222,6 +277,7 @@ contract MoonFomoV3 is Ownable {
     /// @dev calculates dividends minus reinvested funds
     /// @return totalDividends total dividends
     function calcDividends(uint256 _round, address _ticketHolder) public view returns(uint256 totalDividends) {
+      require(_round <= roundCount, "Invalid round count");
       if(rounds[_round].ticketCount == 0){
         return 0;
       }
@@ -236,27 +292,22 @@ contract MoonFomoV3 is Ownable {
     /// @dev calculates jackpot earnings, dividends and ticket reimbursment
     /// @return totalClaim total claim
     function calcPayout(uint256 _round, address _ticketHolder) public view returns(uint256 totalClaim) {
-      if(rounds[_round].claimList[_ticketHolder] == 0){
-        return 0;
-      }
-      totalClaim = calcDividends(_round, _ticketHolder);
-      totalClaim += rounds[_round].claimList[_ticketHolder];
-      return totalClaim;
+      require(_round <= roundCount, "Invalid round count");
+      return rounds[_round].claimList[_ticketHolder];
     }
 
     /// Claim total dividends and winnings earned for a round
     /// @param _round the round to claim
     /// @dev calculates payout and pays user
     function claimPayout(uint256 _round) external {
-      require(rounds[_round].timer < block.timestamp, "Round Not Ended!");
+      require(_round <= roundCount, "Invalid round count");
+      require(rounds[_round].timer < block.timestamp || rounds[_round].ended, "Round Not Ended!");
       require(rounds[_round].claimList[msg.sender] > 0, "You Have Already Claimed!");
 
       (uint256 payout) = calcPayout(_round, msg.sender);
-
-      MoondayToken.transfer(msg.sender, payout);
-
       rounds[_round].claimList[msg.sender] = 0;
 
+      MoondayToken.transfer(msg.sender, payout);
       emit TicketClaimed(_round, msg.sender, payout);
     }
 
@@ -267,8 +318,8 @@ contract MoonFomoV3 is Ownable {
       require(calcDividends(roundCount, msg.sender) >= _amount, "Insufficient Dividends Available!");
 
       rounds[roundCount].reclaimed[msg.sender] += _amount;
-      MoondayToken.transfer(msg.sender, _amount);
 
+      MoondayToken.transfer(msg.sender, _amount);
       emit DividendClaimed(roundCount, msg.sender, _amount);
     }
 
@@ -276,7 +327,7 @@ contract MoonFomoV3 is Ownable {
     /// @dev purchases a ticket with dividends and distributes funds
     /// @return ticket index
     function reinvestDividends(uint256 _amount) external returns(uint256){
-      require(calcDividends(roundCount, msg.sender) >= calcTicketCost(_amount), "Insufficient Dividends Available!");
+      require(calcDividends(roundCount, msg.sender) >= buyPrice(_amount), "Insufficient Dividends Available!");
       require(rounds[roundCount].timer > block.timestamp, "Round Ended!");
 
       emit TicketBought(msg.sender, rounds[roundCount].ticketCount, _amount);
