@@ -9,7 +9,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -49,7 +49,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -88,7 +88,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -125,7 +125,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -160,7 +160,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -195,7 +195,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -230,7 +230,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -267,7 +267,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -295,14 +295,14 @@
       ]
     },
     "F:\\1.devproject\\lottery_project\\work\\contracts\\MoonFomoV3.sol": {
-      "lastModificationDate": 1654771751676,
-      "contentHash": "d85de0ac2b8b264aa602d7bcc0bb3506",
+      "lastModificationDate": 1654881276027,
+      "contentHash": "dcb0c7434bc5ba5b8367a371a75b4ecb",
       "sourceName": "contracts/MoonFomoV3.sol",
       "solcConfig": {
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {
@@ -343,7 +343,7 @@
         "version": "0.8.4",
         "settings": {
           "optimizer": {
-            "enabled": false,
+            "enabled": true,
             "runs": 200
           },
           "outputSelection": {

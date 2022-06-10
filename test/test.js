@@ -2,8 +2,6 @@ const { expect } = require("chai");
 const hardhat = require("hardhat");
 const { ethers } = hardhat;
 
-const ValuableCoinsV3InBSC = 0xF6e497Bd65DfB7c0556020DD68d007f0AC76bc6a;
-
 describe("MoonFomo V3", function() {
   let signers = [];
   let minter;
@@ -56,6 +54,8 @@ describe("MoonFomo V3", function() {
   });
 
   it("Buy Tickets", async function() {
+    console.log("100 Ticket's buy price: ", (await moonFomoV3.buyPrice(100)).toString());
+    console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
     for (let i = 1; i < 8; i++) {
       const _tickets = i;
       const _balanceForTicket = await moonFomoV3.buyPrice(_tickets);
@@ -71,6 +71,18 @@ describe("MoonFomo V3", function() {
     console.log("Balance of Buyers");
     for (let i = 1; i < 8; i++)
       console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
+
+      console.log("100 Ticket's buy price: ", (await moonFomoV3.buyPrice(100)).toString());
+      console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
+  });
+
+  it("Get Round Data", async() => {
+    const _roundCount = await moonFomoV3.roundCount();
+    const _roundData = await moonFomoV3.rounds(_roundCount);
+    console.log("Round Data: ", _roundData);
+
+    const _latestholders = await moonFomoV3.getRoundLatestHolders(_roundCount);
+    console.log("Round LatestHolders: ", _latestholders);
   });
 
   it("End Round", async function() {
@@ -102,14 +114,10 @@ describe("MoonFomo V3", function() {
     for (let i = 1; i < 8; i++) {
       await moonFomoV3.connect(signers[i]).claimPayout(_roundCount);
     }
+    console.log("100 Ticket's buy price: ", (await moonFomoV3.buyPrice(100)).toString());
+    console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
 
     for (let i = 1; i < 8; i++)
       console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
   });
-
-  it("Reinvest Dividends", async function() {
-
-  });
-
-
 });

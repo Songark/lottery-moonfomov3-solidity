@@ -14,8 +14,8 @@ contract MoonFomoV3 is Ownable {
     uint256 public roundCount;
     uint256 constant internal dividendFee_ = 10;
     uint256 constant internal tokenPriceInitial_ = 0.005 ether;
-    uint256 constant internal tokenPriceIncremental_ = 1 ether;
-    uint256 constant internal incTokensPerTicket = 100 ether;
+    uint256 constant internal tokenPriceIncremental_ = 0.001 ether;
+    uint256 constant internal incTokensPerTicket = 1 ether;
 
     uint256 public maxlatestholders = 6;
     uint256 public hoursForRound = 10;
@@ -50,20 +50,20 @@ contract MoonFomoV3 is Ownable {
     constructor(
       address payable owner_, 
       address payable _moondayTokenAddress
-      ) {
+      ) 
+    {
       _owner = owner_;
-
       MoondayToken = IERC20(_moondayTokenAddress);
     }
 
     /// Starts a round and adds transaction to jackpot
     /// @dev increments round count, initiates timer and loads jackpot
-    function initRound(uint _amount) external payable onlyOwner {
+    function initRound(uint256 _amount) external payable onlyOwner {
       require(roundCount == 0 || rounds[roundCount].ended, "Previous Round Not Ended!");
 
       roundCount++;
-      MoondayToken.transferFrom(msg.sender, address(this), _amount);
-      rounds[roundCount].jackpot += _amount;
+      uint256 _sentAmount = transferFrom(msg.sender, address(this), _amount);
+      rounds[roundCount].jackpot += _sentAmount;
       rounds[roundCount].timer = DateTimeLibrary.addHours(block.timestamp, hoursForRound);
 
       emit RoundStarted(roundCount, rounds[roundCount].timer);
@@ -71,12 +71,12 @@ contract MoonFomoV3 is Ownable {
 
     /// Add tokens to jackpot
     /// @dev no increments round count, no initiates timer and only increase the tokens
-    function addTokensToRound(uint _amount) external payable onlyOwner {
+    function addTokensToRound(uint256 _amount) external payable onlyOwner {
       require(!rounds[roundCount].ended, "Round already ended!");
       require(_amount > 0, "Invalid amount");
 
-      MoondayToken.transferFrom(msg.sender, address(this), _amount);
-      rounds[roundCount].jackpot += _amount;
+      uint256 _sentAmount = transferFrom(msg.sender, address(this), _amount);
+      rounds[roundCount].jackpot += _sentAmount;
 
       emit RoundAddedTokens(roundCount, rounds[roundCount].jackpot);
     }
@@ -122,7 +122,7 @@ contract MoonFomoV3 is Ownable {
     /// @return current cost of ticket
     function buyPrice(uint256 _amount) public view returns(uint256) {      
       if (rounds[roundCount].holderPool == 0){
-          return tokenPriceInitial_;
+          return tokenPriceInitial_.mul(_amount);
       } else {
           uint256 _bsc = tokenPriceInitial_.add(rounds[roundCount].holderPool.mul(tokenPriceIncremental_).div(incTokensPerTicket));
           return _bsc.mul(_amount);
@@ -134,44 +134,11 @@ contract MoonFomoV3 is Ownable {
     /// @return current cost of ticket
     function sellPrice(uint256 _amount) public view returns(uint256) {      
       if (rounds[roundCount].holderPool == 0){
-          return tokenPriceInitial_;
+          return tokenPriceInitial_.sub(tokenPriceIncremental_).mul(_amount);
       } else {
-          uint256 _bsc = tokenPriceInitial_.sub(rounds[roundCount].holderPool.mul(tokenPriceIncremental_).div(incTokensPerTicket));
+          uint256 _bsc = tokenPriceInitial_.sub(tokenPriceIncremental_).add(rounds[roundCount].holderPool.mul(tokenPriceIncremental_).div(incTokensPerTicket));
           return _bsc.mul(_amount);
       }
-    }
-
-    /**
-     * Calculate Token price based on an amount of incoming bsc
-     * It's an algorithm, hopefully we gave you the whitepaper with it in scientific notation;
-     * Some conversions occurred to prevent decimal errors or underflows / overflows in solidity code.
-     */
-    function bscToTokens_(uint256 _bsc, uint256 tokenSupply_)
-        internal
-        view
-        returns(uint256)
-    {
-        uint256 _tokenPriceInitial = tokenPriceInitial_ * 1e18;
-        uint256 _tokensReceived = 0;
-        return _tokensReceived;
-    }
-    
-    /**
-     * Calculate token sell value.
-    */
-     function tokensToBSC_(uint256 _tokens, uint256 tokenSupply_)
-        internal
-        view
-        returns(uint256)
-    {
-
-        uint256 tokens_ = (_tokens + 1e18);
-        uint256 _tokenSupply = (tokenSupply_ + 1e18);
-        console.log('_tokenSupply:', _tokenSupply);
-        uint256 _etherReceived =
-          tokenPriceInitial_.add(tokenPriceIncremental_.mul(_tokenSupply.div(1e18))).sub(tokenPriceIncremental_).mul(_tokens)
-          .sub(tokenPriceIncremental_.mul((tokens_**2 - tokens_).div(1e18)).div(2)).div(1e18);
-        return _etherReceived;
     }
 
     /// Buy tickets using token
@@ -183,7 +150,7 @@ contract MoonFomoV3 is Ownable {
       require(_amount > 0, "Invalid amount");
 
       uint256 ticketPrice = buyPrice(_amount);
-      MoondayToken.transferFrom(msg.sender, address(this), ticketPrice);
+      ticketPrice = transferFrom(msg.sender, address(this), ticketPrice);
 
       rounds[roundCount].jackpot += ticketPrice.mul(20).div(100);
       rounds[roundCount].holderPool += ticketPrice.mul(10).div(100);
@@ -225,7 +192,7 @@ contract MoonFomoV3 is Ownable {
       rounds[roundCount].ticketsOwned[msg.sender] -= _amount;
       rounds[roundCount].ticketCount -= _amount;
       rounds[roundCount].holderPool -= ticketPrice;
-      MoondayToken.transfer(msg.sender, ticketPrice);
+      transfer(msg.sender, ticketPrice);
       
       emit TicketSold(msg.sender, rounds[roundCount].ticketCount, ticketPrice);
       return ticketPrice;
@@ -307,7 +274,7 @@ contract MoonFomoV3 is Ownable {
       (uint256 payout) = calcPayout(_round, msg.sender);
       rounds[_round].claimList[msg.sender] = 0;
 
-      MoondayToken.transfer(msg.sender, payout);
+      transfer(msg.sender, payout);
       emit TicketClaimed(_round, msg.sender, payout);
     }
 
@@ -319,18 +286,26 @@ contract MoonFomoV3 is Ownable {
 
       rounds[roundCount].reclaimed[msg.sender] += _amount;
 
-      MoondayToken.transfer(msg.sender, _amount);
+      transfer(msg.sender, _amount);
       emit DividendClaimed(roundCount, msg.sender, _amount);
     }
 
-    /// Buy a ticket with dividends
-    /// @dev purchases a ticket with dividends and distributes funds
-    /// @return ticket index
-    function reinvestDividends(uint256 _amount) external returns(uint256){
-      require(calcDividends(roundCount, msg.sender) >= buyPrice(_amount), "Insufficient Dividends Available!");
-      require(rounds[roundCount].timer > block.timestamp, "Round Ended!");
+    function getRoundLatestHolders(uint256 _round) external view returns (address[] memory) {
+      require(_round <= roundCount, "Invalid round");
+      return rounds[_round].latestholders;
+    }
 
-      emit TicketBought(msg.sender, rounds[roundCount].ticketCount, _amount);
-      return(rounds[roundCount].ticketCount);
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) internal returns (uint256) {
+      MoondayToken.transferFrom(from, to, amount);
+      return amount.mul(97).div(100);
+    }
+
+    function transfer(address to, uint256 amount) internal returns (uint256) {
+      MoondayToken.transfer(to, amount);
+      return amount.mul(97).div(100);
     }
 }
