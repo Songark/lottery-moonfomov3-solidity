@@ -15,7 +15,7 @@ contract MoonFomoV3 is Ownable {
     uint256 constant internal dividendFee_ = 10;
     uint256 constant internal tokenPriceInitial_ = 0.005 ether;
     uint256 constant internal tokenPriceIncremental_ = 0.001 ether;
-    uint256 constant internal incTokensPerTicket = 1 ether;
+    uint256 constant internal incTokensPerTicket = 0.2 ether;
 
     uint256 public maxlatestholders = 6;
     uint256 public hoursForRound = 10;
@@ -42,7 +42,7 @@ contract MoonFomoV3 is Ownable {
     event RoundStarted(uint256 round, uint256 endingTime);
     event RoundAddedTokens(uint256 round, uint256 newJackpot);
     event TicketBought(address buyer, uint256 ticketNumber, uint256 ticketPrice);
-    event TicketSold(address seller, uint256 ticketNumber, uint256 ticketPrice);
+    event TicketSold(address seller, uint256 soldtickets, uint256 ticketPrice);
     event RoundEnded(uint256 round, uint256 jackpot, uint256 tickets);
     event TicketClaimed(uint256 round, address buyer, uint256 claimAmount);
     event DividendClaimed(uint256 round, address claimant, uint256 dividendAmount);
@@ -188,14 +188,34 @@ contract MoonFomoV3 is Ownable {
       require(!rounds[roundCount].ended, "Round already ended!");
       require(rounds[roundCount].ticketsOwned[msg.sender] >= _amount, "Insufficient tickets");
 
-      uint256 ticketPrice = sellPrice(_amount);
-      rounds[roundCount].ticketsOwned[msg.sender] -= _amount;
-      rounds[roundCount].ticketCount -= _amount;
-      rounds[roundCount].holderPool -= ticketPrice;
-      transfer(msg.sender, ticketPrice);
+
+      uint256 claimTokens = rounds[roundCount].claimList[msg.sender];
+      for (uint256 _tokens = _amount; _tokens > 0; _tokens--) {
+        uint256 ticketPrice = sellPrice(_tokens);
+        uint256 dividends = _tokens.mul(rounds[roundCount].holderPool).div(rounds[roundCount].ticketCount);
+        if (ticketPrice <= dividends) {
+          rounds[roundCount].ticketsOwned[msg.sender] -= _tokens;
+          rounds[roundCount].ticketCount -= _tokens;
+          rounds[roundCount].holderPool -= ticketPrice;
+          transfer(msg.sender, ticketPrice);
+          emit TicketSold(msg.sender, _tokens, ticketPrice);
+          return ticketPrice;
+        }
+        else if (ticketPrice <= claimTokens + dividends) {
+          rounds[roundCount].ticketsOwned[msg.sender] -= _tokens;
+          rounds[roundCount].ticketCount -= _tokens;
+          rounds[roundCount].holderPool -= dividends;
+
+          rounds[roundCount].claimList[msg.sender] -= (ticketPrice - dividends);
+
+          transfer(msg.sender, ticketPrice);
+          emit TicketSold(msg.sender, _tokens, ticketPrice);
+          return ticketPrice;
+        }
+      }
       
-      emit TicketSold(msg.sender, rounds[roundCount].ticketCount, ticketPrice);
-      return ticketPrice;
+      emit TicketSold(msg.sender, 0, 0);
+      return 0;
     }
 
     /// Set the increment seconds

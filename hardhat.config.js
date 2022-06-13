@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 require('dotenv').config();
+require('solidity-coverage');
 
 const chainIds = {
   bscMainnet: 56,

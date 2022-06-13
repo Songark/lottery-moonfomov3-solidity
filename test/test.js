@@ -48,7 +48,7 @@ describe("MoonFomo V3", function() {
     const [roundCount1, newJackpot] = _event.args;
     console.log("RoundAddedTokens done: ", roundCount1.toString(), newJackpot.toString());    
 
-    console.log("Balance of Buyers");
+    console.log("[Buyer Index Balance]");
     for (let i = 1; i < 8; i++)
       console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
   });
@@ -56,6 +56,8 @@ describe("MoonFomo V3", function() {
   it("Buy Tickets", async function() {
     console.log("100 Ticket's buy price: ", (await moonFomoV3.buyPrice(100)).toString());
     console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
+
+    console.log("[Description: Buyer RoundAllTickets TicketsPrice]");
     for (let i = 1; i < 8; i++) {
       const _tickets = i;
       const _balanceForTicket = await moonFomoV3.buyPrice(_tickets);
@@ -68,7 +70,7 @@ describe("MoonFomo V3", function() {
       console.log(_tickets, "Ticket bought: ", buyer.toString(), ticketCount.toString(), ticketPrice.toString());  
     }    
 
-    console.log("Balance of Buyers");
+    console.log("[Buyer Index Balance]");
     for (let i = 1; i < 8; i++)
       console.log("Buyer", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
 
@@ -76,10 +78,31 @@ describe("MoonFomo V3", function() {
       console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
   });
 
+  it("Sell Tickets", async function() {
+    console.log("[Description: Seller SoldCounts SoldTicketsPrice]");
+    for (let i = 1; i < 8; i++) {
+      const _tickets = i;
+      _tx = await moonFomoV3.connect(signers[i]).sellTicket(_tickets);
+      _rc = await _tx.wait(); 
+      _event = _rc.events.find(event => event.event === 'TicketSold');
+      const [seller, ticketCount, ticketPrice] = _event.args;
+      console.log(_tickets, "Ticket Sold: ", seller.toString(), ticketCount.toString(), ticketPrice.toString());  
+    }    
+
+    console.log("[Seller Index Balance]");
+    for (let i = 1; i < 8; i++)
+      console.log("Seller", i, (await valuableCoinsV3.balanceOf(signers[i].address)).toString());
+
+    console.log("100 Ticket's buy price: ", (await moonFomoV3.buyPrice(100)).toString());
+    console.log("100 Ticket's sell price: ", (await moonFomoV3.sellPrice(100)).toString());
+  });
+
   it("Get Round Data", async() => {
     const _roundCount = await moonFomoV3.roundCount();
     const _roundData = await moonFomoV3.rounds(_roundCount);
-    console.log("Round Data: ", _roundData);
+    console.log("Round Tickets: ", _roundData.ticketCount.toString());
+    console.log("Round Jackpot: ", _roundData.jackpot.toString());
+    console.log("Round MaxTicketHolder: ", _roundData.maxticketsholder.toString());
 
     const _latestholders = await moonFomoV3.getRoundLatestHolders(_roundCount);
     console.log("Round LatestHolders: ", _latestholders);
